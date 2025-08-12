@@ -268,8 +268,8 @@ Take a deep breath and think step by step to find the identify redundant columns
                 schema_question_pair['input_seq'] = input_prompt
                 schema_question_pair['knowledge'] = database_information
                 schema_question_pair['fd_text'] = database_ratio_text
-                schema_question_pair['consistency_redundant_columns'] = consistency_redundant_columns
-                schema_question_pair['inconsistency_redundant_columns'] = inconsistency_redundant_columns
+                schema_question_pair['consistency_redundant_columns'] = consistency_redundant_columns_list
+                schema_question_pair['inconsistency_redundant_columns'] = inconsistency_redundant_columns_list
                 new_dataset.append(schema_question_pair)
                 
     with open(opt.output_data_file, 'w', encoding='utf-8') as save_f:

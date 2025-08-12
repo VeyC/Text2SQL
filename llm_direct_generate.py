@@ -297,10 +297,11 @@ Output Format:
                 new_consistency_redundant_columns_list = []
                 new_inconsistency_redundant_columns_list = []
                 for t_colunm in columns_used:
-                    _, colunm = t_colunm.split('.')
-                    new_knowledge_list.extend([knowledge for knowledge in knowledge_list if colunm in knowledge])
-                    new_consistency_redundant_columns_list.extend([f"{A} and {B}\n" for A,B in item['consistency_redundant_columns'] if colunm in A+B])
-                    new_inconsistency_redundant_columns_list.extend([f"{A} and {B}\n" for A,B in item['inconsistency_redundant_columns'] if colunm in A+B])
+                    t_colunm = t_colunm.replace('"', "`")
+                    print(t_colunm)
+                    new_knowledge_list.extend([knowledge for knowledge in knowledge_list if t_colunm in knowledge])
+                    new_consistency_redundant_columns_list.extend([f"{A} and {B}\n" for A,B,C,D in item['consistency_redundant_columns'] if t_colunm in A+B])
+                    new_inconsistency_redundant_columns_list.extend([f"{A} and {B}\n" for A,B, C,D in item['inconsistency_redundant_columns'] if t_colunm in A+B])
 
                 new_knowledge_list = list(set(new_knowledge_list))
                 new_consistency_redundant_columns_list = list(set(new_consistency_redundant_columns_list))
