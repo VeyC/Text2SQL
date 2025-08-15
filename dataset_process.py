@@ -51,9 +51,13 @@ if __name__ == "__main__":
     tables = db_model.list_tables()
     
     database_ratio_maps = {}
+    null_column_list = []
     # 遍历所有表
     for table in tables:
-        table_schema_dict = db_model.get_table_attrs(table)
+        # table_schema_dict = db_model.get_table_attrs(table)
+        table_check_null = db_model.check_null_values(table)
+        null_column_list.extend([f'{table}.{col}' for col in table_check_null['columns_with_nulls']])
+
         # 1.1 先对数据库中的每个表分析函数依赖关系
         try:
             # fd_list shape [[[Left],'Right'], [[Left], 'Right'], ...]
@@ -69,7 +73,8 @@ if __name__ == "__main__":
             left_attr = fd[0][0]  # 后面是[0]，因为之前设置的依赖size是1
             right_attr = fd[1]
             # 左值是pk的就不要了吧，毕竟这个函数依赖关系确定了
-            if table_schema_dict[left_attr]['pk'] == False and table_distributions[right_attr]['unique_count'] > 1: 
+            # if table_schema_dict[left_attr]['pk'] == False and table_distributions[right_attr]['unique_count'] > 1: 
+            if table_distributions[right_attr]['unique_count'] > 1:  # 保留主键
                 filted_fd_list.append([left_attr, right_attr])  # 这里去掉left的[]了
         
         # 2. 处理属性之间的比例关系。
@@ -99,7 +104,7 @@ if __name__ == "__main__":
 
     # TODO，用语言描述是不是会好点
     prompt = f'''Task Overview:
-Below, you are provided with a database schema and the proportional relationship between attributes in json format. Please describe the proportional relationship in natural language format. For example, "the relationship from 'satscores.sname' to 'satcores.rttype' is N:1, indicating that ... ." Each relationship requires line breaks, and there is no need to output additional analysis content beyond that.
+Below, you are provided with a database schema and the proportional relationship between attributes in json format. Please describe the proportional relationship in natural language format. For example, "the relationship from satscores.sname to satcores.rttype is N:1, indicating that multiple schools with the same name may belong to the same reporting type." Each relationship requires line breaks, and there is no need to output additional analysis content beyond that.
 
 Database Schema:
 {DDL}
@@ -121,31 +126,113 @@ Proportional Relationship between Attributes:
     # print(f"LLM 输入：\n{prompt}")
     # print(f"LLM 输出text：\n{database_ratio_text}")
     # assert 1==0
-    database_ratio_text = """The relationship from frpm.County Name to frpm.County Code is 1:1, indicating that each county name corresponds to exactly one county code and vice versa.
-The relationship from frpm.District Code to frpm.County Code is N:1, indicating that multiple district codes may be associated with the same county code.
-The relationship from frpm.District Code to frpm.County Name is N:1, indicating that multiple district codes may share the same county name.
-The relationship from frpm.District Code to frpm.District Name is N:1, indicating that multiple district codes may share the same district name.
-The relationship from frpm.District Code to frpm.District Type is N:1, indicating that many districts may have the same type.
-The relationship from frpm.School Code to frpm.School Name is N:1, indicating that multiple school codes may refer to the same school name.
-The relationship from frpm.School Code to frpm.School Type is N:1, indicating that multiple school codes may share the same school type.
-The relationship from frpm.School Code to frpm.Educational Option Type is N:1, indicating that many schools may fall under the same educational option type.
-The relationship from frpm.School Code to frpm.NSLP Provision Status is N:1, indicating that multiple school codes may have the same NSLP status.
-The relationship from frpm.School Code to frpm.Charter School (Y/N) is N:1, indicating that multiple school codes may share the same charter school status.
-The relationship from frpm.School Code to frpm.Charter School Number is N:1, indicating that many schools may share the same charter number.
-The relationship from frpm.School Code to frpm.Charter Funding Type is N:1, indicating that multiple schools may have the same charter funding type.
-The relationship from frpm.School Code to frpm.IRC is N:1, indicating that several schools may share the same IRC value.
-The relationship from frpm.District Name to frpm.District Type is N:1, indicating that multiple districts with the same name may share the same type.
-The relationship from frpm.Charter School Number to frpm.Charter Funding Type is N:1, indicating that the same charter number may correspond to a single funding type.
+    database_ratio_text = """The relationship from frpm.`County Name` to frpm.`County Code` is 1:1, indicating that each county name corresponds to a unique county code.
+The relationship from frpm.CDSCode to frpm.`County Code` is N:1, indicating that multiple CDS codes may belong to the same county code.
+The relationship from frpm.CDSCode to frpm.`District Code` is N:1, indicating that multiple CDS codes may belong to the same district code.
+The relationship from frpm.CDSCode to frpm.`School Code` is N:1, indicating that multiple CDS codes may belong to the same school code.
+The relationship from frpm.CDSCode to frpm.`County Name` is N:1, indicating that multiple CDS codes may belong to the same county.
+The relationship from frpm.CDSCode to frpm.`District Name` is N:1, indicating that multiple CDS codes may belong to the same district.
+The relationship from frpm.CDSCode to frpm.`School Name` is N:1, indicating that multiple CDS codes may belong to the same school.
+The relationship from frpm.CDSCode to frpm.`District Type` is N:1, indicating that multiple CDS codes may belong to the same district type.
+The relationship from frpm.CDSCode to frpm.`School Type` is N:1, indicating that multiple CDS codes may belong to the same school type.
+The relationship from frpm.CDSCode to frpm.`Educational Option Type` is N:1, indicating that multiple CDS codes may belong to the same educational option type.
+The relationship from frpm.CDSCode to frpm.`NSLP Provision Status` is N:1, indicating that multiple CDS codes may have the same NSLP provision status.
+The relationship from frpm.CDSCode to frpm.`Charter School (Y/N)` is N:1, indicating that multiple CDS codes may share the same charter school status.
+The relationship from frpm.CDSCode to frpm.`Charter School Number` is N:1, indicating that multiple CDS codes may share the same charter school number.
+The relationship from frpm.CDSCode to frpm.`Charter Funding Type` is N:1, indicating that multiple CDS codes may have the same charter funding type.
+The relationship from frpm.CDSCode to frpm.IRC is N:1, indicating that multiple CDS codes may have the same IRC status.
+The relationship from frpm.CDSCode to frpm.`Low Grade` is N:1, indicating that multiple CDS codes may have the same low grade level.
+The relationship from frpm.CDSCode to frpm.`High Grade` is N:1, indicating that multiple CDS codes may have the same high grade level.
+The relationship from frpm.CDSCode to frpm.`Enrollment (K-12)` is N:1, indicating that multiple CDS codes may have the same K-12 enrollment number.
+The relationship from frpm.CDSCode to frpm.`Free Meal Count (K-12)` is N:1, indicating that multiple CDS codes may have the same K-12 free meal count.
+The relationship from frpm.CDSCode to frpm.`Percent (%) Eligible Free (K-12)` is N:1, indicating that multiple CDS codes may have the same K-12 percent eligible for free meals.
+The relationship from frpm.CDSCode to frpm.`FRPM Count (K-12)` is N:1, indicating that multiple CDS codes may have the same K-12 FRPM count.
+The relationship from frpm.CDSCode to frpm.`Percent (%) Eligible FRPM (K-12)` is N:1, indicating that multiple CDS codes may have the same K-12 percent eligible for FRPM.
+The relationship from frpm.CDSCode to frpm.`Enrollment (Ages 5-17)` is N:1, indicating that multiple CDS codes may have the same enrollment for ages 5-17.
+The relationship from frpm.CDSCode to frpm.`Free Meal Count (Ages 5-17)` is N:1, indicating that multiple CDS codes may have the same free meal count for ages 5-17.
+The relationship from frpm.CDSCode to frpm.`Percent (%) Eligible Free (Ages 5-17)` is N:1, indicating that multiple CDS codes may have the same percent eligible for free meals for ages 5-17.
+The relationship from frpm.CDSCode to frpm.`FRPM Count (Ages 5-17)` is N:1, indicating that multiple CDS codes may have the same FRPM count for ages 5-17.
+The relationship from frpm.CDSCode to frpm.`Percent (%) Eligible FRPM (Ages 5-17)` is N:1, indicating that multiple CDS codes may have the same percent eligible for FRPM for ages 5-17.
+The relationship from frpm.`District Code` to frpm.`County Code` is N:1, indicating that multiple districts may belong to the same county code.
+The relationship from frpm.`District Code` to frpm.`County Name` is N:1, indicating that multiple districts may belong to the same county.
+The relationship from frpm.`District Code` to frpm.`District Name` is N:1, indicating that multiple district codes may correspond to the same district name.
+The relationship from frpm.`District Code` to frpm.`District Type` is N:1, indicating that multiple districts may belong to the same district type.
+The relationship from frpm.`School Code` to frpm.`School Name` is N:1, indicating that multiple school codes may correspond to the same school name.
+The relationship from frpm.`School Code` to frpm.`School Type` is N:1, indicating that multiple school codes may belong to the same school type.
+The relationship from frpm.`School Code` to frpm.`Educational Option Type` is N:1, indicating that multiple school codes may have the same educational option type.
+The relationship from frpm.`School Code` to frpm.`NSLP Provision Status` is N:1, indicating that multiple school codes may have the same NSLP provision status.
+The relationship from frpm.`School Code` to frpm.`Charter School (Y/N)` is N:1, indicating that multiple school codes may have the same charter school status.
+The relationship from frpm.`School Code` to frpm.`Charter School Number` is N:1, indicating that multiple school codes may share the same charter school number.
+The relationship from frpm.`School Code` to frpm.`Charter Funding Type` is N:1, indicating that multiple school codes may have the same charter funding type.
+The relationship from frpm.`School Code` to frpm.IRC is N:1, indicating that multiple school codes may have the same IRC status.
+The relationship from frpm.`District Name` to frpm.`District Type` is N:1, indicating that multiple districts with the same name may belong to the same district type.
+The relationship from frpm.`Charter School Number` to frpm.`Charter Funding Type` is N:1, indicating that multiple charter school numbers may be associated with the same charter funding type.
+The relationship from satscores.cds to satscores.rtype is N:1, indicating that multiple records with the same CDS code may belong to the same reporting type.
+The relationship from satscores.cds to satscores.sname is N:1, indicating that multiple records with the same CDS code may have the same school name.
+The relationship from satscores.cds to satscores.dname is N:1, indicating that multiple records with the same CDS code may have the same district name.
+The relationship from satscores.cds to satscores.cname is N:1, indicating that multiple records with the same CDS code may have the same county name.
+The relationship from satscores.cds to satscores.enroll12 is N:1, indicating that multiple records with the same CDS code may have the same 12th-grade enrollment number.
+The relationship from satscores.cds to satscores.NumTstTakr is N:1, indicating that multiple records with the same CDS code may have the same number of test-takers.
+The relationship from satscores.cds to satscores.AvgScrRead is N:1, indicating that multiple records with the same CDS code may have the same average reading score.
+The relationship from satscores.cds to satscores.AvgScrMath is N:1, indicating that multiple records with the same CDS code may have the same average math score.
+The relationship from satscores.cds to satscores.AvgScrWrite is N:1, indicating that multiple records with the same CDS code may have the same average writing score.
+The relationship from satscores.cds to satscores.NumGE1500 is N:1, indicating that multiple records with the same CDS code may have the same number of students scoring 1500 or greater.
 The relationship from satscores.sname to satscores.rtype is N:1, indicating that multiple schools with the same name may belong to the same reporting type.
-The relationship from schools.DOCType to schools.DOC is 1:1, indicating that each DOC type corresponds uniquely to a DOC code and vice versa.
-The relationship from schools.SOCType to schools.SOC is 1:1, indicating that each SOC type corresponds uniquely to a SOC code and vice versa.
-The relationship from schools.EdOpsName to schools.EdOpsCode is 1:1, indicating that each educational option name corresponds to a unique code and vice versa.
-The relationship from schools.EILName to schools.EILCode is 1:1, indicating that each EIL name corresponds to a unique code and vice versa.
-The relationship from schools.AdmEmail3 to schools.AdmLName3 is 1:1, indicating that each admin email corresponds to a unique last name and vice versa.
-The relationship from schools.StreetAbr to schools.Street is N:1, indicating that multiple street abbreviations may refer to the same full street name.
-The relationship from schools.MailStrAbr to schools.MailStreet is N:1, indicating that multiple abbreviated mailing street names may refer to the same full name.
-The relationship from schools.AdmLName3 to schools.AdmFName3 is N:1, indicating that multiple admin last names may be associated with the same first name.
-The relationship from schools.AdmEmail3 to schools.AdmFName3 is N:1, indicating that multiple emails may be associated with the same admin first name.
+The relationship from schools.DOCType to schools.DOC is 1:1, indicating that each district of choice type corresponds to a unique district of choice code.
+The relationship from schools.SOCType to schools.SOC is 1:1, indicating that each school of choice type corresponds to a unique school of choice code.
+The relationship from schools.EdOpsName to schools.EdOpsCode is 1:1, indicating that each educational options name corresponds to a unique educational options code.
+The relationship from schools.EILName to schools.EILCode is 1:1, indicating that each educational instruction level name corresponds to a unique educational instruction level code.
+The relationship from schools.AdmEmail3 to schools.AdmLName3 is 1:1, indicating that each administrator 3 email corresponds to a unique administrator 3 last name.
+The relationship from schools.CDSCode to schools.NCESDist is N:1, indicating that multiple CDS codes may belong to the same NCES district code.
+The relationship from schools.CDSCode to schools.NCESSchool is N:1, indicating that multiple CDS codes may belong to the same NCES school code.
+The relationship from schools.CDSCode to schools.StatusType is N:1, indicating that multiple CDS codes may share the same status type.
+The relationship from schools.CDSCode to schools.County is N:1, indicating that multiple CDS codes may belong to the same county.
+The relationship from schools.CDSCode to schools.District is N:1, indicating that multiple CDS codes may belong to the same district.
+The relationship from schools.CDSCode to schools.School is N:1, indicating that multiple CDS codes may belong to the same school.
+The relationship from schools.CDSCode to schools.Street is N:1, indicating that multiple CDS codes may be associated with the same street address.
+The relationship from schools.CDSCode to schools.StreetAbr is N:1, indicating that multiple CDS codes may be associated with the same abbreviated street address.
+The relationship from schools.CDSCode to schools.City is N:1, indicating that multiple CDS codes may be located in the same city.
+The relationship from schools.CDSCode to schools.Zip is N:1, indicating that multiple CDS codes may share the same zip code.
+The relationship from schools.CDSCode to schools.MailStreet is N:1, indicating that multiple CDS codes may share the same mailing street address.
+The relationship from schools.CDSCode to schools.MailStrAbr is N:1, indicating that multiple CDS codes may share the same abbreviated mailing street address.
+The relationship from schools.CDSCode to schools.MailCity is N:1, indicating that multiple CDS codes may share the same mailing city.
+The relationship from schools.CDSCode to schools.MailZip is N:1, indicating that multiple CDS codes may share the same mailing zip code.
+The relationship from schools.CDSCode to schools.Phone is N:1, indicating that multiple CDS codes may be associated with the same phone number.
+The relationship from schools.CDSCode to schools.Ext is N:1, indicating that multiple CDS codes may be associated with the same phone extension.
+The relationship from schools.CDSCode to schools.Website is N:1, indicating that multiple CDS codes may be associated with the same website.
+The relationship from schools.CDSCode to schools.OpenDate is N:1, indicating that multiple CDS codes may be associated with the same opening date.
+The relationship from schools.CDSCode to schools.ClosedDate is N:1, indicating that multiple CDS codes may be associated with the same closing date.
+The relationship from schools.CDSCode to schools.Charter is N:1, indicating that multiple CDS codes may share the same charter status.
+The relationship from schools.CDSCode to schools.CharterNum is N:1, indicating that multiple CDS codes may be associated with the same charter number.
+The relationship from schools.CDSCode to schools.FundingType is N:1, indicating that multiple CDS codes may have the same funding type.
+The relationship from schools.CDSCode to schools.DOC is N:1, indicating that multiple CDS codes may belong to the same district of choice code.
+The relationship from schools.CDSCode to schools.DOCType is N:1, indicating that multiple CDS codes may belong to the same district of choice type.
+The relationship from schools.CDSCode to schools.SOC is N:1, indicating that multiple CDS codes may belong to the same school of choice code.
+The relationship from schools.CDSCode to schools.SOCType is N:1, indicating that multiple CDS codes may belong to the same school of choice type.
+The relationship from schools.CDSCode to schools.EdOpsCode is N:1, indicating that multiple CDS codes may have the same educational options code.
+The relationship from schools.CDSCode to schools.EdOpsName is N:1, indicating that multiple CDS codes may have the same educational options name.
+The relationship from schools.CDSCode to schools.EILCode is N:1, indicating that multiple CDS codes may have the same educational instruction level code.
+The relationship from schools.CDSCode to schools.EILName is N:1, indicating that multiple CDS codes may have the same educational instruction level name.
+The relationship from schools.CDSCode to schools.GSoffered is N:1, indicating that multiple CDS codes may have the same grades offered.
+The relationship from schools.CDSCode to schools.GSserved is N:1, indicating that multiple CDS codes may have the same grades served.
+The relationship from schools.CDSCode to schools.Virtual is N:1, indicating that multiple CDS codes may have the same virtual school status.
+The relationship from schools.CDSCode to schools.Magnet is N:1, indicating that multiple CDS codes may have the same magnet school status.
+The relationship from schools.CDSCode to schools.Latitude is N:1, indicating that multiple CDS codes may have the same latitude.
+The relationship from schools.CDSCode to schools.Longitude is N:1, indicating that multiple CDS codes may have the same longitude.
+The relationship from schools.CDSCode to schools.AdmFName1 is N:1, indicating that multiple CDS codes may have the same administrator 1 first name.
+The relationship from schools.CDSCode to schools.AdmLName1 is N:1, indicating that multiple CDS codes may have the same administrator 1 last name.
+The relationship from schools.CDSCode to schools.AdmEmail1 is N:1, indicating that multiple CDS codes may be associated with the same administrator 1 email.
+The relationship from schools.CDSCode to schools.AdmFName2 is N:1, indicating that multiple CDS codes may have the same administrator 2 first name.
+The relationship from schools.CDSCode to schools.AdmLName2 is N:1, indicating that multiple CDS codes may have the same administrator 2 last name.
+The relationship from schools.CDSCode to schools.AdmEmail2 is N:1, indicating that multiple CDS codes may be associated with the same administrator 2 email.
+The relationship from schools.CDSCode to schools.AdmFName3 is N:1, indicating that multiple CDS codes may have the same administrator 3 first name.
+The relationship from schools.CDSCode to schools.AdmLName3 is N:1, indicating that multiple CDS codes may have the same administrator 3 last name.
+The relationship from schools.CDSCode to schools.AdmEmail3 is N:1, indicating that multiple CDS codes may be associated with the same administrator 3 email.
+The relationship from schools.CDSCode to schools.LastUpdate is N:1, indicating that multiple CDS codes may have been updated on the same date.
+The relationship from schools.StreetAbr to schools.Street is N:1, indicating that multiple street abbreviations can correspond to the same full street name.
+The relationship from schools.MailStrAbr to schools.MailStreet is N:1, indicating that multiple mailing street abbreviations can correspond to the same full mailing street name.
+The relationship from schools.AdmLName3 to schools.AdmFName3 is N:1, indicating that multiple administrators with the same last name may share the same first name.
+The relationship from schools.AdmEmail3 to schools.AdmFName3 is N:1, indicating that multiple administrator 3 emails may correspond to the same administrator 3 first name.
 """
 
     # 3. 处理冗余情况，和数据不一致情况，数据库设计规范的问题，这个很难从数值上确定是不是同一列，可能需要大模型，当然数值上也可以缩小范围
@@ -232,6 +319,7 @@ Take a deep breath and think step by step to find the identify redundant columns
     print(f"一致性列：\n{consistency_redundant_columns_list}")
     print(f"不一致性列：\n{inconsistency_redundant_columns_list}")
 
+
     # 4. 最后，组合这些信息 
     # input schema 和question 描述直接在之前的arctic上面加
     # v1 这是直接加json格式的函数依赖关系
@@ -270,6 +358,7 @@ Take a deep breath and think step by step to find the identify redundant columns
                 schema_question_pair['fd_text'] = database_ratio_text
                 schema_question_pair['consistency_redundant_columns'] = consistency_redundant_columns_list
                 schema_question_pair['inconsistency_redundant_columns'] = inconsistency_redundant_columns_list
+                schema_question_pair['null_column'] = null_column_list
                 new_dataset.append(schema_question_pair)
                 
     with open(opt.output_data_file, 'w', encoding='utf-8') as save_f:

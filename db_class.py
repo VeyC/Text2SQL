@@ -287,6 +287,71 @@ class Database:
         return distribution_stats
 
 
+
+    def check_null_values(self, table_name=None):
+        """
+        检查表中哪些列包含空值，哪些列不包含空值
+        
+        Args:
+            table_name: 表名（如果为None，使用当前设置的表）
+        
+        Returns:
+            dict: {
+                'columns_with_nulls': [列名列表],
+                'columns_without_nulls': [列名列表]
+            }
+        """
+        if table_name:
+            temp_table = self.table_name
+            self.set_table(table_name)
+        
+        if self.data is None:
+            print("数据未加载，无法检查空值")
+            return {
+                'columns_with_nulls': [],
+                'columns_without_nulls': [],
+                'null_details': {}
+            }
+        
+        columns_with_nulls = []
+        columns_without_nulls = []
+        
+        
+        print(f"\n=== 检查表 '{self.table_name}' 的空值情况 ===")
+        
+        for column in self.data.columns:
+            try:
+                # 计算空值数量
+                null_count = self.data[column].isnull().sum()
+                
+                # 分类列
+                if null_count > 0:
+                    columns_with_nulls.append(column)
+                else:
+                    columns_without_nulls.append(column)
+            except Exception as e:
+                print(f"检查列 '{column}' 时出错: {e}")
+
+        
+        # 打印汇总信息
+        print("-" * 70)
+        print(f"包含空值的列数: {columns_with_nulls}")
+        print(f"不包含空值的列数: {columns_without_nulls}")
+        
+        
+        # 恢复原来的表设置
+        if table_name and temp_table:
+            self.table_name = temp_table
+            self.load_data()
+        
+        result = {
+            'columns_with_nulls': columns_with_nulls,
+            'columns_without_nulls': columns_without_nulls
+        }
+        
+        return result
+
+
     def close(self):
         """关闭数据库连接"""
         self.conn.close()
